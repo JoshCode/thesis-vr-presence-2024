@@ -128,7 +128,7 @@ for (fake_data_file in fake_data_files) {
   dvs <- c("physical_presence_score", "social_presence_score", "self_presence_score")
   for (dv in dvs) {
     # print(paste("=====", dv, "====="))
-    model_1 <- lmer(as.formula(paste(dv, " ~ treatment + (1 | person_id:dyad_id)")), REML = TRUE, data = fake_data)
+    model_1 <- lmer(as.formula(paste(dv, " ~ treatment + (1 | dyad_id/person_id)")), REML = TRUE, data = fake_data)
     summ <- summary(model_1)
   
     stats <- vector("numeric", 2)
