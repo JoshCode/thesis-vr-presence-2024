@@ -1,0 +1,175 @@
+---
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: console
+---
+```{r}
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(rmcorr)
+```
+
+```{r}
+raw_data <- readr::read_csv("data/data_processed.csv", show_col_types = FALSE)
+data <- raw_data
+
+factor_cols <- c("dyad_id", "person_id", "order_id", "treatment", "treatment_name")
+data[,factor_cols] <- lapply(data[,factor_cols], factor)
+```
+
+```{r}
+# Sandbox cell, used for running arbitrary, temporary code (and learning R)
+MModel <- lmer(social_presence_score ~ treatment + (1|person_id:dyad_id), REML = TRUE, data = data)
+summary(MModel)
+# anova(MModel)
+```
+
+```{r}
+# Calculate mean and SD for dependent variables grouped by treatment
+library(data.table)
+
+cols <- c("treatment", "physical_presence_score", "social_presence_score", "self_presence_score", "presence_score")
+DT <- data.table(data[cols])
+
+DT
+
+# If we want to add names to the columns 
+wide <- setnames(DT[, sapply(.SD, function(x) list(mean=round(mean(x), 5), sd=round(sd(x), 5))), by=treatment], c("treatment", sapply(names(DT)[-1], paste0, c(".M", ".SD"))))
+
+wide
+```
+
+```{r}
+# Calculate dependent variable correlations, corrected for repeated measures
+cor_phys_soc <- rmcorr(data$person_id, data$physical_presence_score, data$social_presence_score, dataset = data)
+cor_phys_self <- rmcorr(data$person_id, data$physical_presence_score, data$self_presence_score, dataset = data)
+cor_soc_self <- rmcorr(data$person_id, data$social_presence_score, data$self_presence_score, dataset = data)
+
+sprintf("Physical-Social corr: r=%s, p=%s",  cor_phys_soc$r,  cor_phys_soc$p)
+sprintf("Physical-Self   corr: r=%s, p=%s", cor_phys_self$r, cor_phys_self$p)
+sprintf("Social  -Self   corr: r=%s, p=%s",  cor_soc_self$r,  cor_soc_self$p)
+```
+
+```{r}
+# Retrieve model data for presence scales
+presence_data <- list()
+dvs <- c("physical_presence_score", "social_presence_score", "self_presence_score")
+for (dv in dvs) {
+  print(paste("=====", dv, "====="))
+  model_1 <- lmer(as.formula(paste(dv, " ~ treatment + (1 | dyad_id/person_id)")), REML = TRUE, data = data)
+  summ <- summary(model_1)
+  print(summ)
+  stats <- summ$coefficients
+  presence_data[[dv]] <- summ$coefficients
+}
+
+for (dv in dvs) {
+  write.csv(presence_data[[dv]], file=paste("calc_presence_data_", dv, ".csv", sep=""))
+}
+```
+
+```{r}
+# Retrieve model data for individual question items
+presence_data <- list()
+dvs <- paste("q", 1:17, sep="")
+for (dv in dvs) {
+  print(paste("=====", dv, "====="))
+  model_1 <- lmer(as.formula(paste(dv, " ~ treatment + (1 | dyad_id/person_id)")), REML = TRUE, data = data)
+  summ <- summary(model_1)
+  print(summ)
+  
+  stats <- vector("numeric", 10)
+  stats <- setNames(stats, c("Static.M", "Static.SD", "Eye.M", "Eye.SD", "Eye.t", "Eye.p", "Full.M", "Full.SD", "Full.t", "Full.p"))
+  
+  stats["Eye.t"] <- summ$coefficients["treatmentB",]["t value"]
+  stats["Eye.p"] <- summ$coefficients["treatmentB",]["Pr(>|t|)"]
+  stats["Full.t"] <- summ$coefficients["treatmentC",]["t value"]
+  stats["Full.p"] <- summ$coefficients["treatmentC",]["Pr(>|t|)"]
+  
+  stats["Static.M"] <- mean(data[data$treatment == "A",][[dv]])
+  stats["Static.SD"] <- sd(data[data$treatment == "A",][[dv]])
+  stats["Eye.M"] <- mean(data[data$treatment == "B",][[dv]])
+  stats["Eye.SD"] <- sd(data[data$treatment == "B",][[dv]])
+  stats["Full.M"] <- mean(data[data$treatment == "C",][[dv]])
+  stats["Full.SD"] <- sd(data[data$treatment == "C",][[dv]])
+
+  presence_data[[dv]] <- stats
+}
+
+for (dv in dvs) {
+  write.csv(presence_data, file="calc_presence_data_questions.csv")
+}
+```
+
+```{r}
+# Data analysis on hypothetical generated data
+# See Python processing file for explanation
+
+fake_data_files <- paste("generated_data_simulation_", 0:3999, ".csv", sep="")
+
+eye_phys_significance <- 0
+eye_social_significance <- 0
+eye_self_significance <- 0
+full_phys_significance <- 0
+full_social_significance <- 0
+full_self_significance <- 0
+
+for (fake_data_file in fake_data_files) {
+  print(fake_data_file)
+  fake_data <- readr::read_csv(paste("data/generated/", fake_data_file, sep=""), show_col_types = FALSE)
+
+  factor_cols <- c("dyad_id", "person_id", "order_id", "treatment", "treatment_name")
+  fake_data[,factor_cols] <- lapply(fake_data[,factor_cols], factor)
+  
+  presence_data <- list()
+  dvs <- c("physical_presence_score", "social_presence_score", "self_presence_score")
+  for (dv in dvs) {
+    # print(paste("=====", dv, "====="))
+    model_1 <- lmer(as.formula(paste(dv, " ~ treatment + (1 | person_id:dyad_id)")), REML = TRUE, data = fake_data)
+    summ <- summary(model_1)
+  
+    stats <- vector("numeric", 2)
+    stats <- setNames(stats, c("Eye.p", "Full.p"))
+    
+    stats["Eye.p"] <- summ$coefficients["treatmentB",]["Pr(>|t|)"]
+    stats["Full.p"] <- summ$coefficients["treatmentC",]["Pr(>|t|)"]
+    
+    presence_data[[dv]] <- stats
+  }
+  
+  if ((presence_data$physical_presence_score < 0.05)["Eye.p"]) {
+    eye_phys_significance <- eye_phys_significance + 1
+  }
+  if ((presence_data$social_presence_score < 0.05)["Eye.p"]) {
+    eye_social_significance <- eye_social_significance + 1
+  }
+  if ((presence_data$self_presence_score < 0.05)["Eye.p"]) {
+    eye_self_significance <- eye_self_significance + 1
+  }
+  if ((presence_data$physical_presence_score < 0.05)["Full.p"]) {
+    full_phys_significance <- full_phys_significance + 1
+  }
+  if ((presence_data$social_presence_score < 0.05)["Full.p"]) {
+    full_social_significance <- full_social_significance + 1
+  }
+  if ((presence_data$self_presence_score < 0.05)["Full.p"]) {
+    full_self_significance <- full_self_significance + 1
+  }
+  
+}
+
+print(eye_phys_significance)
+print(eye_social_significance)
+print(eye_self_significance)
+print(full_phys_significance)
+print(full_social_significance)
+print(full_self_significance)
+
+
+# for (dv in dvs) {
+#   write.csv(presence_data[[dv]], file=paste("calc_presence_data_", dv, ".csv", sep=""))
+# }
+```

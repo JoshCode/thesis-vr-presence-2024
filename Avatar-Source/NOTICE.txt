@@ -1,0 +1,6 @@
+Avatars in this project are based on the CC Character Base 3 by Reallusion.
+
+CC Character Base 3 is freely availble at https://www.reallusion.com/character-creator/free-3d-character-base.html
+
+Licensed under section 5 of the Reallusion End-User License Agreement
+https://www.reallusion.com/Content/EULA/AP/EULA_AP.htm
