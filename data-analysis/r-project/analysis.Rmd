@@ -10,6 +10,7 @@ library(tidyverse)
 library(lme4)
 library(lmerTest)
 library(rmcorr)
+library(ggplot2)
 ```
 
 ```{r}
@@ -22,7 +23,7 @@ data[,factor_cols] <- lapply(data[,factor_cols], factor)
 
 ```{r}
 # Sandbox cell, used for running arbitrary, temporary code (and learning R)
-MModel <- lmer(social_presence_score ~ treatment + (1|person_id:dyad_id), REML = TRUE, data = data)
+MModel <- lmer(social_presence_score ~ treatment + (1|dyad_id/person_id), REML = TRUE, data = data)
 summary(MModel)
 # anova(MModel)
 ```
@@ -108,7 +109,7 @@ for (dv in dvs) {
 # Data analysis on hypothetical generated data
 # See Python processing file for explanation
 
-fake_data_files <- paste("generated_data_simulation_", 0:3999, ".csv", sep="")
+fake_data_files <- paste("generated_data_simulation_", 0:99, ".csv", sep="")
 
 eye_phys_significance <- 0
 eye_social_significance <- 0

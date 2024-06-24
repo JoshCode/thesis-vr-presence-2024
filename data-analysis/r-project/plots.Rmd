@@ -1,0 +1,97 @@
+---
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: console
+---
+```{r}
+library(plyr)
+library(tidyverse)
+library(lme4)
+library(lmerTest)
+library(rmcorr)
+library(ggplot2)
+library(viridis)
+library(hrbrthemes)
+```
+
+```{r}
+raw_data <- readr::read_csv("data/data_processed.csv", show_col_types = FALSE)
+data <- raw_data
+
+
+
+factor_cols <- c("dyad_id", "person_id", "order_id", "treatment", "treatment_name")
+data[,factor_cols] <- lapply(data[,factor_cols], factor)
+```
+
+```{r}
+# Sandbox cell, used for running arbitrary, temporary code (and learning R)
+MModel <- lmer(self_presence_score ~ treatment + (1|dyad_id/person_id), REML = TRUE, data = data)
+summary(MModel)
+# anova(MModel)
+```
+
+```{r}
+# Plotting code
+# ggplot(data, aes(x = "A")) +
+  # geom_histogram() +
+  # facet_wrap(~ social_presence_score)
+
+plot_data <- data %>% pivot_longer(cols = ends_with("score"), names_pattern = "(\\w+)_score", names_to = c("score"))
+plot_data <- plot_data[plot_data$score %in% c("physical_presence", "social_presence", "self_presence"),]
+
+plot_data$score <- mapvalues(plot_data$score, 
+          from=c("physical_presence","social_presence","self_presence"), 
+          to=c("physical","social","self"))
+
+data %>% 
+  # transform(score = factor(score, levels=c("physical", "social", "self"))) %>%
+  
+  ggplot( aes(x = treatment, y = social_presence_score)) +
+  geom_point() +
+  facet_wrap(~person_id)
+  # scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+  # theme_ipsum() +
+  # theme(
+  #   legend.position="none",
+  #   plot.title = element_text(size=11)
+  # ) +
+  # ggtitle("A boxplot with jitter") +
+  # xlab("condition")
+```
+
+```{r}
+# Plotting code
+# ggplot(data, aes(x = "A")) +
+  # geom_histogram() +
+  # facet_wrap(~ social_presence_score)
+
+plot_data <- data %>% pivot_longer(cols = ends_with("score"), names_pattern = "(\\w+)_score", names_to = c("score"))
+plot_data <- plot_data[plot_data$score %in% c("physical_presence", "social_presence", "self_presence"),]
+
+plot_data$score <- mapvalues(plot_data$score, 
+          from=c("physical_presence","social_presence","self_presence"), 
+          to=c("Physical","Social","Self"))
+
+plot_data$treatment <- mapvalues(plot_data$treatment, 
+          from=c("A","B","C"), 
+          to=c("Static","Eye","Full"))
+
+plot_data %>% 
+  transform(score = factor(score, levels=c("Physical","Social","Self"))) %>%
+  
+  ggplot( aes(x = treatment, y = value, fill = treatment)) +
+  geom_boxplot() +
+  facet_wrap(~score) + 
+  scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+  geom_jitter(color="black", size=0.4, alpha=0.9) +
+  theme_ipsum() +
+  theme(
+    legend.position="none",
+    plot.title = element_text(size=11)
+  ) +
+  # ggtitle("A boxplot with jitter") +
+  xlab("condition")
+```
