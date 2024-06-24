@@ -73,25 +73,31 @@ plot_data <- plot_data[plot_data$score %in% c("physical_presence", "social_prese
 
 plot_data$score <- mapvalues(plot_data$score, 
           from=c("physical_presence","social_presence","self_presence"), 
-          to=c("Physical","Social","Self"))
+          to=c("Physical pres.","Social pres.","Self-pres."))
 
 plot_data$treatment <- mapvalues(plot_data$treatment, 
           from=c("A","B","C"), 
           to=c("Static","Eye","Full"))
 
 plot_data %>% 
-  transform(score = factor(score, levels=c("Physical","Social","Self"))) %>%
+  transform(score = factor(score, levels=c("Physical pres.","Social pres.","Self-pres."))) %>%
   
   ggplot( aes(x = treatment, y = value, fill = treatment)) +
-  geom_boxplot() +
+  geom_boxplot(outlier.shape = NA, colour = "#444444") +
+  scale_fill_viridis(discrete = TRUE, alpha=0.4) +
+  geom_jitter(color="black", width=.3, size=.8, alpha=1) +
   facet_wrap(~score) + 
-  scale_fill_viridis(discrete = TRUE, alpha=0.6) +
-  geom_jitter(color="black", size=0.4, alpha=0.9) +
   theme_ipsum() +
+  scale_y_continuous(breaks = seq(1, 7, by = 1)) + 
   theme(
     legend.position="none",
-    plot.title = element_text(size=11)
+    plot.title = element_text(size=11),
+    rect = element_rect(fill = "transparent"),
+    # axis.ticks.y.left = element_line(color="black"),
+    # axis.minor.ticks.y.left = element_line(color="black")
   ) +
   # ggtitle("A boxplot with jitter") +
-  xlab("condition")
+  xlab("condition") +
+  ylab("score")
+ggsave(file="presence-box_plot.svg", width=6, height=4)
 ```
